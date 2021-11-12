@@ -1,0 +1,2 @@
+# CustomerCohortApp
+ Shiny application for simulating how a firm develops over time (e.g. by choosing how many customers it acquires and how much each customer spends). You can then (i) value the firm using a customer-based valuation approach, (ii) see how the firm develops cohort by cohort, (iii) look at most common marketing metrics on an aggregate and cohort-level, and (iv) explore typical SaaS metrics in a dashboard. 
