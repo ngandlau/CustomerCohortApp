@@ -991,8 +991,6 @@ PlotOperatingMarginByCohort <- function(fromPeriod, toPeriod, revMatrix, profitM
       scale_x_continuous(breaks = fromPeriod:toPeriod) +
       scale_y_continuous(labels = FormatPercent) +
       theme_gg() +
-      # ggtitle("Operating Margin broken down by Cohorts",
-              # subtitle = "Operating Margin = (Profit before Fixed Costs) / Revenue") +
       xlab("Period") +
       ylab("Operating Margin") +
       labs(color = "Cohort")
@@ -1017,7 +1015,6 @@ PlotProfitsByCohort <- function(fromPeriod, toPeriod, profitMatrix){
       scale_x_continuous(breaks = fromPeriod:toPeriod) +
       scale_y_continuous(labels = FormatDollars) +
       theme_gg() +
-      # ggtitle("Profit (before fixed costs) per Period broken down by Cohorts") +
       xlab("Period") +
       ylab("Profit") +
       labs(color = "Cohort")
@@ -1058,7 +1055,7 @@ PlotNetRevenueRetentionRate <- function(nrr){
   )
   ggplot(dtPlt, aes(x = t, y = NetRevenueRetention)) +
     geom_col(fill = kDarkestBlue) +
-    geom_text(aes(label = paste0(NetRevenueRetention*100, "%")), vjust = -0.4) +
+    geom_text(aes(label = paste0(round(NetRevenueRetention*100,2), "%")), vjust = -0.4) +
     xlab("Period") +
     ylab("Net Revenue Retention Rate") +
     # ggtitle("Net Revenue Retention Retention Rate") +
@@ -1247,19 +1244,10 @@ PlotCohortedContributionLTVCACCurves <- function(X){
   ggplot(dt, aes(x = age, y = value, color = cohort)) +
     geom_line() +
     geom_point() +
-    geom_text(
-      data = dt %>% filter(cohort == 1),
-      mapping = aes(label = round(value, 2)), 
-      size = 3,
-      color = "black",
-      vjust = -0.4
-    ) +
     scale_x_continuous(breaks = min(dt$age):max(dt$age)) +
     theme_gg() +
     xlab("Cohort Age") +
     ylab("LTV/CAC") 
-    # ggtitle("(Cumulative Profit Contribution)/CAC Curves",
-            # subtitle = "Profit Contribution after Product and Marketing Cost")
 }
 
 CumulativeCohortLTVs <- function(revMatrix, n){
