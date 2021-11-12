@@ -9,3 +9,11 @@ The app then allows to explore the firm's (customer-based) valuation at differen
 ## Live Demo
 
 https://nilsg.shinyapps.io/CBFV
+
+## App Impressions
+
+![](img/app_impression_1.png)
+
+![](img/app_impression_2.png)
+
+![](img/app_impression_3.png)
