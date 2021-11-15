@@ -11,7 +11,7 @@ cohortChartsServer <- function(id, X, n){
         id,
         function(input, output, session){
             output$chart <- renderPlot({
-                X <- X()[1:n(), 1:n()]
+                X <- as.matrix(X()[1:n(), 1:n()])
                 if (input$chartType == "Cohort-Period Heatmap"){
                     PlotHeatmap(X = X, x = "period", y = "cohort")
                 } else if (input$chartType == "Cohort-Age Heatmap") {

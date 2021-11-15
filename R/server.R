@@ -51,23 +51,29 @@ server <- function(input, output, session){
     } else {
       nAcquired <- sapply(1:dim(), function(t) input$nNew + (t-1)*input$nNewIncrease)
       nAcquired[nAcquired > input$nNewMax] <- input$nNewMax
+      nAcquired[nAcquired < 0] <- 0
       custMatrix <- GenConstantValues(1, dim()) * nAcquired
     }
     retainedCustMatrix <- custMatrix * survMatrix()
   })
   
   retMatrix <- reactive({
-    retMatrix <- GenConstantValues(value = input$retRate, dim = dim())
-    diag(retMatrix) <- 1
-    if (input$advancedSettings == T){
+    if (input$advancedSettings == F){
+      retMatrix <- GenConstantValues(value = input$retRate, dim = dim())
+    } else {
       retGrowthMatrix <- GenLinearAgeEffectMatrix(
         slope = input$retRateIncrease,
         dim = dim()
       )
       retMatrix <- retMatrix + retGrowthMatrix
       retMatrix[retMatrix > input$retRateMax] <- input$retRateMax
-      diag(retMatrix) <- 1
+      
+      # Retention Rates must be within [0, 1]
+      retMatrix[retMatrix > 1] <- 1
+      retMatrix[retMatrix < 0] <- 0
     }
+    # Retention Rate in the acquisition period is 100% by assumption
+    diag(retMatrix) <- 1
     return(retMatrix)
   })
   
@@ -87,11 +93,11 @@ server <- function(input, output, session){
       revMatrix <- revMatrix + revGrowthMatrix
       revMatrix[revMatrix > input$revMax] <- input$revMax
     }
-    revMatrix * custMatrix()
+    return(revMatrix * custMatrix())
   })
   
   varCostMatrix <- reactive({
-    contributionMargin <- input$cm
+    contributionMargin <- input$contributionMargin
     varCost <- revMatrix() * (1-contributionMargin)
   })
   
@@ -100,7 +106,7 @@ server <- function(input, output, session){
     retCostMatrix * custMatrix()
   })
   
-  cacMatrix <- reactive({
+  acqCostMatrix <- reactive({
     if (input$advancedSettings == F){
       cacMatrix <- GenDiagonalValues(input$cac, dim())
     } else {
@@ -112,11 +118,11 @@ server <- function(input, output, session){
   })
   
   varProdCostMatrix <- reactive({
-    revMatrix() * input$cm
+    revMatrix() * input$contributionMargin
   })
   
   costMatrix <- reactive({
-    costMatrix <- varCostMatrix() + retCostMatrix() + cacMatrix()
+    costMatrix <- varCostMatrix() + retCostMatrix() + acqCostMatrix()
   })
   
   profitMatrix <- reactive({
@@ -230,10 +236,10 @@ server <- function(input, output, session){
   
   output$periodView_profitLossStatement <- renderDT({
     dataProfitLoss <- ComputeProfitLossStatement(
-      showNPeriods = input$valuationPeriod,
+      n = input$valuationPeriod,
       revMatrix = revMatrix(),
       varCostMatrix = varCostMatrix(), 
-      cacMatrix = cacMatrix(), 
+      acqCostMatrix = acqCostMatrix(), 
       retCostMatrix = retCostMatrix(), 
       fixedCost = input$fixedCost
     )
@@ -247,7 +253,7 @@ server <- function(input, output, session){
       CohortViewTable(
         revMatrix = revMatrix(),
         costMatrix = costMatrix(),
-        cacMatrix = cacMatrix(),
+        acqCostMatrix = acqCostMatrix(),
         retCostMatrix = retCostMatrix(),
         varCostMatrix = varCostMatrix(),
         profitMatrix = profitMatrix(),
@@ -310,7 +316,7 @@ server <- function(input, output, session){
   
   cohortChartsServer(
     id = "cac",
-    X = cacMatrix,
+    X = acqCostMatrix,
     n = n
   )
   
@@ -393,8 +399,8 @@ server <- function(input, output, session){
   )
 
   cohortTableServer(
-    id = "cacMatrix",
-    X = cacMatrix,
+    id = "acqCostMatrix",
+    X = acqCostMatrix,
     rowColSumsCP = c(F, T),
     rowColSumsCA = c(F, F),
     n = n,
@@ -475,7 +481,7 @@ server <- function(input, output, session){
   
   plotPeriodCohortViewServer(
     id = "dashboard_marketingCosts",
-    X = reactive(retCostMatrix()+cacMatrix()),
+    X = reactive(retCostMatrix()+acqCostMatrix()),
     fromPeriod = 1,
     toPeriod = n,
     geomType = "geom_col",
@@ -529,7 +535,7 @@ server <- function(input, output, session){
       toPeriod = input$valuationPeriod,
       varCostMatrix = varCostMatrix(),
       retCostMatrix = retCostMatrix(),
-      cacMatrix = cacMatrix(),
+      acqCostMatrix = acqCostMatrix(),
       fixedCost = input$fixedCost
     )
   })
@@ -616,7 +622,7 @@ server <- function(input, output, session){
     PlotCumulativeProfitContributionCurves(
       adjProfitMatrix = CumulativeProfitContribution(
         profitMatrix = profitMatrix(),
-        cacMatrix = cacMatrix(),
+        acqCostMatrix = acqCostMatrix(),
         retCostMatrix = retCostMatrix(),
         varProdCostMatrix = varProdCostMatrix(),
         beforeAcqCost = T,
@@ -633,7 +639,7 @@ server <- function(input, output, session){
     PlotCumulativeProfitContributionCurves(
       adjProfitMatrix = CumulativeProfitContribution(
         profitMatrix = profitMatrix(),
-        cacMatrix = cacMatrix(),
+        acqCostMatrix = acqCostMatrix(),
         retCostMatrix = retCostMatrix(),
         varProdCostMatrix = varProdCostMatrix(),
         beforeAcqCost = T,
@@ -650,7 +656,7 @@ server <- function(input, output, session){
     PlotCumulativeProfitContributionCurves(
       adjProfitMatrix = CumulativeProfitContribution(
         profitMatrix = profitMatrix(),
-        cacMatrix = cacMatrix(),
+        acqCostMatrix = acqCostMatrix(),
         retCostMatrix = retCostMatrix(),
         varProdCostMatrix = varProdCostMatrix(),
         beforeAcqCost = F,
@@ -667,7 +673,7 @@ server <- function(input, output, session){
     PlotCohortedContributionLTVCACCurves(
       CohortedContributionLTVCACCurves(
         profitMatrix = profitMatrix(),
-        cacMatrix = cacMatrix(),
+        acqCostMatrix = acqCostMatrix(),
         n = input$valuationPeriod
       )
     )
