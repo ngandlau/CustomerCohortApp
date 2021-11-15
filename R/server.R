@@ -58,6 +58,7 @@ server <- function(input, output, session){
     if (input$advancedSettings == F){
       retMatrix <- GenConstantValues(value = input$retRate, dim = dim())
     } else {
+      retMatrix <- GenConstantValues(value = input$retRate, dim = dim())
       retGrowthMatrix <- GenLinearAgeEffectMatrix(
         slope = input$retRateIncrease,
         dim = dim()

@@ -149,7 +149,7 @@ tabCohorts <- list(
     tabPanel(
       title = "Acquisition Costs",
       Heading("Cohort Array"),
-      cohortTableUI(id = "cacMatrix"),
+      cohortTableUI(id = "acqCostMatrix"),
       Heading("Visualizations"),
       cohortChartsUI(id = "cac",
                      choices = c(
