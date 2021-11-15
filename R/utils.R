@@ -32,7 +32,6 @@ CustomerEquity <- function(t, profitMatrix, discRate){
   ))
 }
 
-
 IllustrativeValuationTable <- function(t, profitMatrix, discMatrix, isDiscounted,
                                        fixedCost, discRate, ce, noa, debt){
   if (isDiscounted == T){
@@ -1210,7 +1209,6 @@ PlotCumulativeCohortLTVs <- function(X){
     scale_y_continuous(labels = FormatDollars) +
     xlab("Cohort Age") +
     ylab("Cumulative Revenue")
-    # ggtitle("Cumulative Revenue Curves")
 }
 
 CumulativeProfitContribution <- function(profitMatrix, 
@@ -1244,6 +1242,7 @@ PlotCumulativeProfitContributionCurves <- function(adjProfitMatrix, title, subti
   
   ggplot(dt, aes(x = age, y = value, color = cohort)) +
     geom_line() +
+    geom_point() +
     geom_hline(yintercept = 0, color = "black", size = 1, linetype = "dashed") +
     theme_gg() +
     scale_x_continuous(breaks = min(dt$age):max(dt$age)) +
@@ -1447,8 +1446,6 @@ Diag <- function(x){
 
 # Matrix Utils ------------------------------------------------------------
 
-
-
 SurvivalRates <- function(retMatrix){
   diags <- diag(retMatrix)
   retMatrix[is.na(retMatrix)] <- 1
@@ -1457,7 +1454,6 @@ SurvivalRates <- function(retMatrix){
   diag(survMatrix) <- diags
   return(survMatrix)
 }
-
 
 #' Calculates period-by-period growth rates given a cohort matrix X
 #'

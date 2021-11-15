@@ -1,11 +1,6 @@
 server <- function(input, output, session){
   
-  # Misc  ------------------------------------------------------------
-  
-  dim <- reactive({
-    nPeriodsToZero <- NPeriodsToZero(retRate = input$retRate, precision = 1e-5)
-    nPeriodsToZero * 4
-  })
+
   
   customerEquity <- reactive({
     CustomerEquity(
@@ -15,9 +10,7 @@ server <- function(input, output, session){
     )
   })
   
-  
-
-# Update Inputs -----------------------------------------------------------
+# Update Dynamic UI Inputs -----------------------------------------------------------
 
   observe({
     updateNumericInput(
@@ -42,9 +35,13 @@ server <- function(input, output, session){
     )
   })
   
-  
-# Cohort Matrices -----------------------------------------------------------
+# Data-Generating Process -----------------------------------------------------------
 
+  dim <- reactive({
+    nPeriodsToZero <- NPeriodsToZero(retRate = input$retRate, precision = 1e-5)
+    nPeriodsToZero * 4
+  })
+  
   custMatrix <- reactive({
     if (input$advancedSettings == F){
       custMatrix <- GenConstantValues(input$nNew, dim())
@@ -678,21 +675,6 @@ server <- function(input, output, session){
       )
     )
   })
-  
-  # output$dashboard_growthRatesRevenues <- renderPlot({
-  #   PlotGrowthRates(
-  #     dtGrowthRates = GrowthRates(X = revMatrix(), n = input$valuationPeriod),
-  #     title = "Growth Rate of Revenues"
-  #   )
-  # })
-  # 
-  # output$dashboard_growthRatesCustomers <- renderPlot({
-  #   PlotGrowthRates(
-  #     dtGrowthRates = GrowthRates(X = custMatrix(), n = input$valuationPeriod),
-  #     title = "Growth Rate of Number of Customers"
-  #   )
-  # })
-  
   
 }
 
