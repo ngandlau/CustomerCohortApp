@@ -1,4 +1,4 @@
-# CustomerCohortApp
+# App for Simulating and Valuing Firms
 
 Shiny application for simulating how a firm develops over time, cohort by cohort. 
  
