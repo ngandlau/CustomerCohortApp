@@ -40,41 +40,54 @@ IllustrativeValuationTable <- function(t, profitMatrix, discMatrix, isDiscounted
     X <- profitMatrix
   }
   
+  # ROW 1: Existing Cohorts
   if (t == 1){
     existCohorts <- X[1, 1:3]
-    existCohortLTV <- sum(X[1, ])
+    existCohortsLTV <- sum(X[1, ])
   } else {
     existCohorts <- colSums(X[1:t, t:(t+2)], na.rm = T)
-    existCohortLTV <- sum(X[1:t, t:ncol(X)], na.rm = T)
+    existCohortsLTV <- sum(X[1:t, t:ncol(X)], na.rm = T)
   }
+  row1 <- c(existCohorts, existCohortsLTV)
   
   # rows 2-4 show the future cohorts (t+1), (t+2), (t+3)
   # and their profits in t, t+1, t+2
-  futCohorts <- X[(t+1):(t+1+2), t:(t+2)]
-  futCohortsLTV <- rowSums(X[(t+1):(t+2), t:ncol(X)], na.rm = T)
+  futCohorts <- X[(t+1):(t+3), t:(t+2)]
+  futCohortsLTV <- rowSums(X[(t+1):(t+3), t:ncol(X)], na.rm = T)
+  row2to4 <- cbind(futCohorts, futCohortsLTV)
   
-  tbl <- rbind(existCohorts, futCohorts)
-  rownames(tbl) <- sapply(t:(t+3), function(c){
-    paste0("Cohort ", c)
-  })
+  # row 5 shows all future cohorts together
+  sumOfAllFutCohorts <- sum(X[(t+4):nrow(X), t:ncol(X)], na.rm = T)
+  row5 <- c(NA, NA, NA, sumOfAllFutCohorts)
   
-  if (t > 1) {
-    newRownames <- rownames(tbl)
-    newRownames <- newRownames[2: length(newRownames)]
-    rownames(tbl) <- c(paste0("Cohorts 1-", t), newRownames)
+  # Build table
+  tbl <- rbind(row1, row2to4, row5)
+  
+  if (t == 1){
+    rownames(tbl) <- c(
+      "Cohort 1",
+      "Cohort 2",
+      "Cohort 3",
+      "Cohort 4",
+      "Cohort 5-Inf"
+    )
+  } else {
+    rownames(tbl) <- c(
+      paste0("Cohorts 1-", t),
+      paste0("Cohort ", t+1),
+      paste0("Cohort ", t+2),
+      paste0("Cohort ", t+3),
+      paste0("Cohorts ", t+4, "-Inf")
+    )
   }
   
-  # add period-by-period profits
-  tbl <- rbind(tbl, colSums(tbl, na.rm = T))
+  # Row: Profits before Fixed Costs
+  profitsBeforeFixedCosts <- c(
+    colSums(tbl[1:3, 1:3], na.rm = T),
+    existCohortsLTV + sum(futCohortsLTV) + sumOfAllFutCohorts
+  )
+  tbl <- rbind(tbl, profitsBeforeFixedCosts)
   
-  # add a column with cohort lifetime values 
-  if (isDiscounted == T){
-    cohortLTVs <- c(existCohortLTV, futCohortsLTV, NA, ce)
-  } else if (isDiscounted == F){
-    cohortLTVs <- c(existCohortLTV, futCohortsLTV, NA, NA)
-  }
-  
-  tbl <- cbind(tbl, cohortLTVs)
   
   # Add fixed cost
   fixedCosts <- rep(fixedCost, 3)
@@ -104,10 +117,10 @@ IllustrativeValuationTable <- function(t, profitMatrix, discMatrix, isDiscounted
   
   rowNames <- rownames(tbl)[1:4]
   rowNames <- c(
-    rownames(tbl)[1:4], # cohort rows
-    "Profits before Fixed Costs",
+    rownames(tbl)[1:5], # cohort rows
+    "Profit before Fixed Costs",
     "Fixed Costs",
-    "Profits after Fixed Costs",
+    "Profit after Fixed Costs",
     "Non-Operating Assets",
     "Debt",
     "Enterprise Value"
@@ -352,6 +365,156 @@ PlotDiscountedProfitContributionPerCohort <- function(discProfitsPerCohort){
     ggtitle("Present Value of (remaining) Profits per Cohort") +
     ylab("Present Value of a cohort's cumulative profits") +
     xlab("Cohort")
+}
+
+
+# Tab: Customer Equity Reporting ------------------------------------------
+
+PlotCustomerEquityReporting <- function(t, custMatrix, revMatrix, profitMatrix, discMatrix, discRate){
+  n <- t+1
+  
+  nCustomersNew <- Diag(custMatrix[1:n, 1:n])
+  nCustomersBegin <- ColSums(custMatrix[1:n, 1:n], na.rm = T)
+  nCustomersExist <- nCustomersBegin - nCustomersNew
+  nCustomersEnd <- nCustomersBegin - nCustomersNew
+  
+  nCustomersNew <- nCustomersNew[1:t]
+  nCustomersBegin <- nCustomersBegin[1:t]
+  nCustomersExist <- nCustomersExist[1:t]
+  nCustomersEnd <- nCustomersEnd[2:(t+1)]
+  nCustomersLost <- nCustomersEnd - nCustomersBegin
+  
+  revenues <- ColSums(revMatrix[1:t, 1:t], na.rm = T)
+  profits <- ColSums(profitMatrix[1:t, 1:t], na.rm = T)
+  profitPerCustomer <- profits / nCustomersBegin
+  
+  discProfitMatrix <- profitMatrix * discMatrix
+  
+  # customer equity in the current period t
+  ceOfCurrentCustomers <- CustomerEquity(t = t, profitMatrix = profitMatrix, discRate = discRate)[["ceCurrent"]]
+  ceOfExistingCustomers <- sum(discProfitMatrix[1:(t-1), t:ncol(discProfitMatrix)], na.rm = T)
+  ceOfNewCustomers <- sum(discProfitMatrix[t, t:ncol(discProfitMatrix)], na.rm = T)
+  ceOfLostCustomers <- NULL #TODO ??? why do we need that, really? Doesnt bring ANY value...
+  
+  # customer equity in the previous period t-1
+  t_ <- t-1
+  discMatrixPrev <- GenDiscountMatrix(
+    discRate = discRate,
+    dim = ncol(discMatrix),
+    startFromPeriod = t_
+  )
+  discProfitMatrixPrev <- profitMatrix * discMatrixPrev
+  
+  ceOfCurrentCustomersPrev <- CustomerEquity(t = t_, profitMatrix = profitMatrix, discRate = discRate)[["ceCurrent"]]
+  ceOfExistingCustomersPrev <- sum(discProfitMatrixPrev[1:(t_-1), t:ncol(discProfitMatrixPrev)], na.rm = T)
+  ceOfNewCustomersPrev <- sum(discProfitMatrix[t_, t_:ncol(discProfitMatrix)], na.rm = T)
+  ceOfLostCustomersPrev <- NULL #TODO ??? why do we need that, really? Doesnt bring ANY value...
+  
+  revenueRow <- revenues[(t-1):t]
+  profitRow <- profits[(t-1):t]
+  
+  nBeginRow <- nCustomersBegin[(t-1):t]
+  nExistRow <- nCustomersExist[(t-1):t]
+  nNewRow <- nCustomersNew[(t-1):t]
+  
+  nEndRow <- nCustomersEnd[(t-1):t]
+  nLostRow <- nCustomersLost[(t-1):t]
+  
+  profitPerCustomerRow <- profitPerCustomer[(t-1):t]
+  
+  ceOfCurrentCustomersRow <- c(ceOfCurrentCustomersPrev, ceOfCurrentCustomers)
+  ceOfExistCustomersRow <- c(ceOfExistingCustomersPrev, ceOfExistingCustomers)
+  ceOfNewCustomersRow <- c(ceOfNewCustomersPrev, ceOfNewCustomers)
+  
+  valuesBefore <- c(
+    revenues[t_],
+    profits[t_],
+    nCustomersBegin[t_],
+    nCustomersExist[t_],
+    nCustomersNew[t_],
+    nCustomersEnd[t_],
+    nCustomersLost[t_],
+    profitPerCustomer[t_],
+    ceOfCurrentCustomersPrev,
+    ceOfExistingCustomersPrev,
+    ceOfNewCustomersPrev
+  )
+  
+  valuesAfter <- c(
+    revenues[t],
+    profits[t],
+    nCustomersBegin[t],
+    nCustomersExist[t],
+    nCustomersNew[t],
+    nCustomersEnd[t],
+    nCustomersLost[t],
+    profitPerCustomer[t],
+    ceOfCurrentCustomers,
+    ceOfExistingCustomers,
+    ceOfNewCustomers
+  )
+  
+  FormatValues <- function(x){
+    x <- as.character(round(x, 0))
+    x[1:2] <- FormatDollars(as.numeric(x[1:2]), digits = 0)
+    x[8:11] <- FormatDollars(as.numeric(x[8:11]), digits = 0)
+    return(x)
+  }
+  
+  valuesBefore <- FormatValues(x = valuesBefore)
+  valuesAfter <- FormatValues(x = valuesAfter)
+  
+  result <- cbind(valuesBefore, valuesAfter)
+  
+  rownames(result) <- c(
+    "Revenue",
+    "Profit",
+    "Number of Customers at Beginning of Period, thereof",
+    "--- Number of Existing Customers",
+    "--- Number of New Customers",
+    "Number of Customers at End of Period",
+    "Number of Lost Customers",
+    "Profit per Customer",
+    "Customer Equity of Current Customers, thereof",
+    "--- Customer Equity of Existing Customers",
+    "--- Customer Equity of New Customers"
+  )
+  
+  colnames(result) <- c(
+    paste0("t=", t-1),
+    paste0("t=", t)
+  )
+  
+  result <- data.table(result, keep.rownames = T)
+  setnames(x = result, old = "rn", new = "---")
+  
+  DT::datatable(
+    result, 
+    rownames = F,
+    options = list(
+      pageLength = 11,
+      info = F, # removes the "Show 1 of 11 entries"-text at the bottom of a DT
+      searching = F, # disables search bar in the top-right corner
+      paging = F, # disables "Show X entries" option
+      ordering = F
+    )
+  ) %>% 
+    formatStyle(
+      columns = 1,
+      target = "row",
+      fontWeight = styleEqual(
+        c(
+          "Revenue",
+          "Profit",
+          "Number of Customers at Beginning of Period, thereof",
+          "Number of Customers at End of Period",
+          "Number of Lost Customers",
+          "Profit per Customer",
+          "Customer Equity of Current Customers, thereof"
+        ),
+        rep("bold", 7)
+      )
+    )
 }
 
 # Tab: Cohort View -------------------------------------------------------------
@@ -1031,16 +1194,21 @@ PlotCustomerRetentionRate <- function(customerRetentionRates){
     scale_y_continuous(labels = FormatPercent)
 }
 
-NewExistLostCustomers <- function(custMatrix, retRate, n){
-  X <- as.matrix(custMatrix[1:n, 1:n])
-  new <- Diag(X)
-  exist <- ColSums(X, na.rm = T) - new
-  lost <- exist * (1 - retRate)
+NewExistLostCustomers <- function(t, custMatrix){
+  beginMatrix <- as.matrix(custMatrix[1:t, 1:t])
+  endMatrix <- as.matrix(custMatrix[1:t, 2:(t+1)])
+  
+  lostMatrix <- endMatrix - beginMatrix
+  lost <- ColSums(lostMatrix, na.rm = T)
+  
+  new <- Diag(beginMatrix)
+  exist <- ColSums(beginMatrix, na.rm = T) - new
+  
   dt <- data.table(
-    t = 1:n,
+    t = 1:t,
     new = new,
     exist = exist,
-    lost = -lost
+    lost = lost
   )
   dt <- melt(dt,
              measure.vars = c("new", "exist", "lost"),
@@ -1062,22 +1230,26 @@ PlotNewExistLostCustomers <- function(dt){
     ) +
     theme_gg() +
     geom_hline(yintercept = 0, color = "black", size = 1, linetype = "dashed") +
-    # ggtitle("Number of New, Existing, and Lost Customers") +
     xlab("Period") +
     ylab("Number of Customers") +
     scale_x_continuous(breaks = 1:max(dt$t))
 }
 
-NewExistLostRevenue <- function(revMatrix, retRate, n){
+NewExistLostRevenue <- function(revMatrix, n){
   X <- as.matrix(revMatrix[1:n, 1:n])
+  
+  rev <- ColSums(X, na.rm = T)
   new <- Diag(X)
-  exist <- ColSums(X, na.rm = T) - new
-  lost <- exist * (1 - retRate)
+  exist <- rev - new
+  
+  revPrev <- c(0, rev[1:(length(rev)-1)])
+  lost <- exist - revPrev
+  
   dt <- data.table(
     t = 1:n,
     new = new,
     exist = exist,
-    lost = -lost
+    lost = lost
   )
   dt <- melt(dt,
              measure.vars = c("new", "exist", "lost"),

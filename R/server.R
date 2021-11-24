@@ -70,8 +70,11 @@ server <- function(input, output, session){
       retMatrix[retMatrix > 1] <- 1
       retMatrix[retMatrix < 0] <- 0
     }
-    # Retention Rate in the acquisition period is 100% by assumption
+    # Assumption: Customers stay for at least one full period.
     diag(retMatrix) <- 1
+    
+    # Assumption: Customers churn in the beginning of each period
+    # diag(retMatrix) <- input$retRate
     return(retMatrix)
   })
   
@@ -229,6 +232,21 @@ server <- function(input, output, session){
     )
     
   })
+  
+
+  # Tab: Customer Equity Reporting ------------------------------------------
+  
+  output$ce_customerEquityReporting <- renderDT({
+    PlotCustomerEquityReporting(
+      t = input$valuationPeriod, 
+      custMatrix = custMatrix(), 
+      revMatrix = revMatrix(),
+      profitMatrix = profitMatrix(),
+      discMatrix = discMatrix(),
+      discRate = input$discRate
+    )
+  })
+  
   
   # Tab: Period View ------------------------------------------------------
   
@@ -571,8 +589,7 @@ server <- function(input, output, session){
     PlotNewExistLostCustomers(
       NewExistLostCustomers(
         custMatrix = custMatrix(),
-        retRate = input$retRate,
-        n = input$valuationPeriod
+        t = input$valuationPeriod
       )
     )
   })
@@ -581,7 +598,6 @@ server <- function(input, output, session){
     PlotNewExistLostRevenue(
       NewExistLostRevenue(
         revMatrix = revMatrix(),
-        retRate = input$retRate,
         n = input$valuationPeriod
       )
     )
@@ -602,7 +618,6 @@ server <- function(input, output, session){
       toPeriod = input$valuationPeriod,
       newExistLostRevenue = NewExistLostRevenue(
         revMatrix = revMatrix(),
-        retRate = input$retRate,
         n = input$valuationPeriod
       )
     )

@@ -5,22 +5,7 @@ source("moduleCohortTable.R")
 source("moduleCohortChart.R")
 source("modulePlotPeriodCohortView.R")
 source("utils.R")
-
-
-# Tab: Introduction -------------------------------------------------------
-tabIntroduction <- list(
-  # includeMarkdown("documentation.rmd")
-  Heading("Introduction to the R Shiny App"),
-  p(LoremIpsum(textLength = 500)),
-  img(src="figure-customer-equity.png", align = "center", style = "width: 100%; max-width: 700px; margin: 1em 0"),
-  Heading("Another Header"),
-  p(LoremIpsum(textLength = 500)),
-  Heading("Final Header"),
-  p(LoremIpsum(textLength = 500)),
-  Heading("More Information"),
-  p(LoremIpsum(textLength = 250))
-)
-
+source("tabIntroduction.R")
 
 # Tab: Valuation ---------------------------------------------------------------
 tabValuation  <- list(
@@ -44,6 +29,14 @@ tabValuation  <- list(
       plotOutput("valuation_discProfitsPerCohort")
     )
   )
+)
+
+
+# Tab: Customer Equity ----------------------------------------------------
+
+tabCustomerEquity <- list(
+  Heading("Customer Equity Reporting"),
+  DTOutput("ce_customerEquityReporting")
 )
 
 # Tab: Period View ---------------------------------------------------------------
@@ -315,6 +308,7 @@ ui <- shiny::navbarPage(
       mainPanel = shiny::mainPanel(
         shiny::tabsetPanel(
             tabPanel(title = "Valuation", tabValuation),
+            tabPanel(title = "Customer Equity Reporting", tabCustomerEquity),
             tabPanel(title = "Period View", tabPeriodView),
             tabPanel(title = "Cohort View", tabCohortView),
             tabPanel(title = "Cohort Arrays", tabCohorts),
