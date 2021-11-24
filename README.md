@@ -1,6 +1,6 @@
-# App for Simulating and Valuing Firms
+# An R Shiny App for Simulating and Valuing Firms
 
-Shiny application for simulating how a firm develops over time, cohort by cohort. 
+R Shiny application for simulating how a firm develops over time, cohort by cohort. 
  
 For example, you can choose how many customers the firm acquires and how much each customer spends.
 
