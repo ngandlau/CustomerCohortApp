@@ -1,5 +1,5 @@
 tabIntroduction <- list(
-    Heading("Introduction to the R Shiny App"),
+    Heading("Introduction to the R Shiny App (to be done by Bernd)"),
     tags$p("#todo"),
     # img(src="figure-customer-equity.png", align = "center", style = "width: 100%; max-width: 700px; margin: 1em 0"),
     Heading("Assumptions made for the data-generating process"),
@@ -14,5 +14,5 @@ tabIntroduction <- list(
                  and costs generated in the specified valuation period do not need to be discounted.")
     ),
     Heading("Authors"),
-    HTML("<p>App developed by Prof. Dr. Bernd Skiera & <a href='https://www.nilsgandlau.de'>Nils Gandlau</a>.</p>")
+    HTML("<p>App developed by Prof. Dr. Bernd Skiera & Nils Gandlau</p>")
 )

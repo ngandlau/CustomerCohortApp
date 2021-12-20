@@ -53,13 +53,13 @@ tabCohortView <- list(
   DTOutput("cohortView_cohortViewTable")
 )
 
-# Tab: Cohorts ---------------------------------------------------------------
+# Tab: Cohort Tables ---------------------------------------------------------------
 
 tabCohorts <- list(
   tabsetPanel(
     tabPanel(
       title = "Number of Customers",
-      Heading("Cohort Array"),
+      Heading("Cohort Table"),
       cohortTableUI(id = "custMatrix"),
       Heading("Visualizations"),
       cohortChartsUI(id = "nCustomers",
@@ -78,7 +78,7 @@ tabCohorts <- list(
                    label = "",
                    choiceNames = c("Customer Retention Rate", "Customer Survival Rate"),
                    choiceValues = c("retentionRate", "survivalRate")),
-      Heading("Cohort Array"),
+      Heading("Cohort Table"),
       cohortTableUI(id = "custRetMatrix"),
       Heading("Visualizations"),
       cohortChartsUI(id = "customerRetention",
@@ -91,12 +91,17 @@ tabCohorts <- list(
     ),
     tabPanel(
       title = "Revenue",
-      radioButtons(inputId = "revenueType", 
-                   label = "Metric",
+      radioButtons(inputId = "arrays_revenue_metric", 
+                   label = "",
                    choiceNames = c("Revenue per Cohort", "Avg. Revenue per Customer := Revenue(t) / Customers(t)", "Avg. Revenue per Customer := Revenue(t) / Customers at Acquisition"),
                    choiceValues = c("revenue", "arpu1", "arpu2")),
-      Heading("Cohort Array"),
-      cohortTableUI(id = "revMatrix"),
+      Heading("Cohort Table"),
+      radioButtons("arrays_revenue_arrayType",
+                   label = "",
+                   choiceNames = c("Cohort-Period Array", "Cohort-Age Array"),
+                   choiceValues = c("cohort-period", "cohort-age")
+                   ),
+      DTOutput("arrays_revenue"),
       Heading("Visualizations"),
       cohortChartsUI(id = "revenue",
                      choices = c(
@@ -114,7 +119,7 @@ tabCohorts <- list(
                    label = "",
                    choiceNames = c("NRR relative to previous period", "NRR relative to acquisition period"),
                    choiceValues = c("prev", "acq")),
-      Heading("Cohort Array"),
+      Heading("Cohort Table"),
       cohortTableUI(id = "revRetMatrix"),
       Heading("Visualizations"),
       cohortChartsUI(id = "revRet",
@@ -127,7 +132,7 @@ tabCohorts <- list(
     ),
     tabPanel(
       title = "Profit",
-      Heading("Cohort Array"),
+      Heading("Cohort Table"),
       cohortTableUI(id = "profitMatrix"),
       Heading("Visualizations"),
       cohortChartsUI(id = "profits",
@@ -141,8 +146,18 @@ tabCohorts <- list(
     ),
     tabPanel(
       title = "Acquisition Costs",
-      Heading("Cohort Array"),
-      cohortTableUI(id = "acqCostMatrix"),
+      Heading("Calculation of Metric"),
+      radioButtons(inputId = "acqCostType",
+                   label = "",
+                   choiceNames = c("Acquisition Cost per Cohort", "Acquisition Cost per Customer"),
+                   choiceValues = c("acqCostPerCohort", "acqCostPerCustomer")),
+      Heading("Cohort Table"),
+      radioButtons("arrays_acqCost_arrayType",
+                   label = "",
+                   choiceNames = c("Cohort-Period Array", "Cohort-Age Array"),
+                   choiceValues = c("cohort-period", "cohort-age")
+      ),
+      DTOutput("arrays_acqCost"),
       Heading("Visualizations"),
       cohortChartsUI(id = "cac",
                      choices = c(
@@ -154,7 +169,7 @@ tabCohorts <- list(
     ),
     tabPanel(
       title = "Retention Costs",
-      Heading("Cohort Array"),
+      Heading("Cohort Table"),
       cohortTableUI(id = "retCostMatrix"),
       Heading("Visualizations"),
       cohortChartsUI(id = "retCost",
@@ -168,10 +183,10 @@ tabCohorts <- list(
     ),
     tabPanel(
       title = "Variable Costs",
-      Heading("Cohort Array"),
-      cohortTableUI(id = "varCostMatrix"),
+      Heading("Cohort Table"),
+      cohortTableUI(id = "prodCostMatrix"),
       Heading("Visualizations"),
-      cohortChartsUI(id = "varCost",
+      cohortChartsUI(id = "prodCost",
                      choices = c(
                        "Cohort-Period Heatmap",
                        "Cohort-Age Heatmap",
@@ -182,7 +197,7 @@ tabCohorts <- list(
     ),
     tabPanel(
       title = "Total Costs",
-      Heading("Cohort Array"),
+      Heading("Cohort Table"),
       cohortTableUI(id = "costMatrix"),
       Heading("Visualizations"),
       cohortChartsUI(id = "cost",
@@ -202,55 +217,134 @@ tabCohorts <- list(
 
 
 tabDashboard  <- list(
-  tabsetPanel(
-    tabPanel(
-      title = "Dashboard",
+      # ... Number of Customers -----------------------------------------------------
       Heading("Number of Customers"),
-      plotPeriodCohortViewUI(id = "dashboard_nCustomers"),
+      radioButtons(
+        "dashboard_nCustomersSwitch",
+        label = "",
+        choiceNames = c(
+          "Number of Customers by Periods",
+          "Number of Customers by Cohorts",
+          "Number of Lost, Existing, and New Customers",
+          "Customer Retention Rate"
+        ),
+        choiceValues = c(
+          "period_view",
+          "cohort_view",
+          "lost_exist_new",
+          "customer_retention_rate"
+        ),
+        width = "100%"
+      ),
+      plotOutput("dashboard_nCustomers"),
+
+      # ... Revenues -----------------------------------------------------
       Heading("Revenues"),
-      plotPeriodCohortViewUI(id = "dashboard_revenues"),
+      radioButtons(
+        "dashboard_revSwitch",
+        label = "",
+        choiceNames = c(
+          "Revenues by Periods",
+          "Revenues by Cohorts",
+          "Lost, New, and Existing Revenues",
+          "Quick Ratio (= New Revenue / Lost Revenue)",
+          "Share of Revenues from Existing vs New Customers",
+          "Net Revenue Retention Rate"
+        ),
+        choiceValues = c(
+          "period_view",
+          "cohort_view",
+          "lost_exist_new",
+          "quick_ratio",
+          "share_exist_new",
+          "net_revenue_retention"
+        ),
+        width = "100%"
+      ),
+      plotOutput("dashboard_revenues"),
+      
+      # ... ARPU -----------------------------------------------------
       Heading("Average Revenue per Customer"),
-      plotPeriodCohortViewUI(id = "dashboard_ARPU"),
-      Heading("Marketing Costs (Retention Cost + Acquisition Cost)"),
-      plotPeriodCohortViewUI(id = "dashboard_marketingCosts"),
-      Heading("Costs broken down by Category"),
+      radioButtons(
+        "dashboard_arpuSwitch",
+        label = "",
+        choiceNames = c(
+          "Avg. Revenue per Customer by Periods",
+          "Avg. Revenue per Customer by Cohorts"
+        ),
+        choiceValues = c(
+          "period_view",
+          "cohort_view"
+        )
+      ),
+      plotOutput("dashboard_ARPU"),
+      
+      # ... Costs -----------------------------------------------------
+      Heading("Costs"),
+      radioButtons(
+        "dashboard_costSwitch",
+        label = "",
+        choiceNames = c(
+          "Total Cost by Categories",
+          "Marketing Cost by Periods",
+          "Marketing Cost by Cohorts"
+        ),
+        choiceValues = c(
+          "cost_by_categories",
+          "marketing_cost_periods",
+          "marketing_cost_cohorts"
+        )
+      ),
       plotOutput("dashboard_costs"),
-      Heading("Operating Margin"),
-      p("Operating Margin = (Profit before Fixed Cost)/Revenue"),
-      radioButtons("dashboard_operatingMarginSwitch", label = "", choices = c("Period View", "Cohort View")),
-      plotOutput("dashboard_operatingMargin"),
-      Heading("Profits before Fixed Costs"),
-      radioButtons("dashboard_profitsBeforeFixedCostsSwitch", label = "", choices = c("Period View", "Cohort View")),
-      plotOutput("dashboard_profitsBeforeFixedCosts"),
-      Heading("Profits after Fixed Costs"),
-      plotOutput("dashboard_profitsAfterFixedCosts")
-    ),
-    tabPanel(
-      title = "SaaS Dashboard",
-      Heading("Number of New, Existing, and Lost Customers"),
-      plotOutput("dashboard_newExistLostCustomers"),
-      Heading("Amount of New, Existing, and Lost Revenue"),
-      plotOutput("dashboard_newExistLostRevenues"),
-      Heading("Share of Revenues from New vs. Existing Customers"),
-      plotOutput("dashboard_shareOfExistVsNewRevenue"),
-      Heading("Customer Retention Rate"),
-      plotOutput("dashboard_overallCRR"),
-      Heading("Net Revenue Retention Rate"),
-      plotOutput("dashboard_overallNRR"),
-      Heading("Quick Ratio"),
-      plotOutput("dashboard_quickRatio"),
-      Heading("Cumulative Revenue"),
-      plotOutput("dashboard_cohortRevenueLTVCurves"),
-      Heading("Cumulative Profit Contribution after Product Cost"),
-      plotOutput("dashboard_cohortProfitContributionAfterProductCost"),
-      Heading("Cumulative Profit Contribution after Variable Cost"),
-      plotOutput("dashboard_cohortProfitContributionAfterVariableCost"),
-      Heading("Cumulative Profit Contribution after Product and Marketing Cost"),
-      plotOutput("dashboard_cohortProfitContributionAfterAllCost"),
-      Heading("(Cumulative Profit Contribution after after Product and Marketing Cost) / Acquisition Costs"),
-      plotOutput("dashboard_cohortLTVCACCurves")
-    )
-  )
+      
+            
+      # ... Profits -----------------------------------------------------
+      Heading("Profits"),
+      radioButtons(
+        inputId = "dashboard_profitsSwitch",
+        label = "",
+        choiceNames = c(
+          "Profits after Fixed Cost by Periods",
+          "Profits before Fixed Cost by Periods",
+          "Profits before Fixed Cost by Cohorts",
+          "Operating Margin before Fixed Cost by Periods",
+          "Operating Margin before Fixed Cost by Cohorts"
+        ),
+        choiceValues = c(
+          "profits_after_fixcost_by_periods",
+          "profits_by_periods",
+          "profits_by_cohorts",
+          "opmargin_by_periods",
+          "opmargin_by_cohorts"
+        ),
+        width = "100%"
+      ),
+      plotOutput("dashboard_profits"),
+      
+      # ... Cumulative Cohort Lifetime Curves ----------------------------------
+      Heading("Cumulative Cohort Lifetime Curves"),
+      radioButtons(
+        inputId = "dashboard_cohortLifetimeCurvesSwitch",
+        label = "",
+        choiceNames = c(
+          "Cumulative Cohort Revenues",
+          "Cumulative Cohort Revenues / Cohort Acquisition Cost",
+          "Cumulative Cohort Profits after Product Cost",
+          "Cumulative Cohort Profits after Variable Cost",
+          "Cumulative Cohort Profits after Variable Cost and Acquisition Cost",
+          "Cumulative Cohort Profits after Variable Cost and Acquisition Cost / Cohort Acquisition Costs"
+        ),
+        choiceValues = c(
+          "cum_revenue",
+          "cum_revenue/cac",
+          "cum_profit_after_prodcost",
+          "cum_profit_after_varcost",
+          "cum_profit_after_prodcost_and_marcost",
+          "cum_profit_after_prodcost_and_marcost/cac"
+        ), 
+        width = "100%"
+      ),
+      plotOutput("dashboard_cohortLifetimeCurves")
 )
 
 
@@ -280,7 +374,7 @@ ui <- shiny::navbarPage(
         Heading("Data-generating Process"),
         numericInput("nNew", "Acquired Customers per Period", value = 20, width = "200px"),
         numericInput("cac", "Customer Acquisition Cost", min = 0, value = 250, width = "200px"),
-        numericInput("rev", "Revenue per Customer", value = 200, width = "200px"),
+        numericInput("revIntercept", "Revenue per Customer", value = 200, width = "200px"),
         numericInput("contributionMargin", "Contribution Margin", min = 0, max = 1, value = 0.8, width = "200px"),
         numericInput("retCost", "Retention Cost per Customer", min = 0, value = 20, width = "200px"),
         numericInput("retRate", "Customer Retention Rate", min = 0, max = 1, value = 0.8, width = "200px"),
@@ -294,14 +388,32 @@ ui <- shiny::navbarPage(
         checkboxInput("advancedSettings", label = "Enable Advanced Settings", value = F),
         conditionalPanel(
           condition = "input.advancedSettings == true",
-          numericInput("nNewIncrease", label = "Increase in Acquired Customers per Period", value = 0),
-          numericInput("nNewMax", label = "Max. Acquired Customers per Period", value = -1),
-          numericInput("cacIncrease", label = "Increase in Customer Acquisition Cost", value = 0),
-          numericInput("cacMax", label = "Max. Customer Acquisition Cost", value = -1),
-          numericInput("revIncrease", label = "Increase in Revenue per Customer over the Customer's Lifecycle", value = 0),
-          numericInput("revMax", label = "Max. Revenue per Customer", value = -1),
-          numericInput("retRateIncrease", label = "Increase in Customer Retention Rate over the Customer's Lifecycle", value = 0),
-          numericInput("retRateMax", label = "Max. Customer Retention Rate", value = -1)
+          Heading2("Number of Acquired Customers"),
+          numericInput("nNewSlope", label = "Slope across Periods", value = 0),
+          fluidRow(
+            column(6, numericInput("nNewMin", label = "Min", value = -1)),
+            column(6, numericInput("nNewMax", label = "Max", value = -1))
+          ),
+          Heading2("Customer Acquisition Cost"),
+          numericInput("cacSlope", label = "Slope across Periods", value = 0),
+          fluidRow(
+            column(6, numericInput("cacMin", label = "Min", value = -1)),
+            column(6, numericInput("cacMax", label = "Max", value = -1))
+          ),
+          Heading2("Revenue per Customer"),
+          numericInput("revAgeSlope", label = "Slope across the Lifecycle", value = 0),
+          numericInput("revCohortSlope", label = "Slope across Cohorts", value = 0),
+          fluidRow(
+            column(6, numericInput("revMin", label = "Min", value = -1)),
+            column(6, numericInput("revMax", label = "Max", value = -1))
+          ),
+          Heading2("Customer Retention Rate"),
+          numericInput("retRateAgeSlope", label = "Slope across the Lifecycle", value = 0),
+          numericInput("retRateCohortSlope", label = "Slope across Cohorts", value = 0),
+          fluidRow(
+            column(6, numericInput("retRateMin", label = "Min", value = 0)),
+            column(6, numericInput("retRateMax", label = "Max", value = 0))
+          )
         )
       ),
       # MAIN PANEL --------------------------------------------------------
@@ -311,7 +423,7 @@ ui <- shiny::navbarPage(
             tabPanel(title = "Customer Equity Reporting", tabCustomerEquity),
             tabPanel(title = "Period View", tabPeriodView),
             tabPanel(title = "Cohort View", tabCohortView),
-            tabPanel(title = "Cohort Arrays", tabCohorts),
+            tabPanel(title = "Cohort Tables", tabCohorts),
             tabPanel(title = "Dashboard", tabDashboard)
         )
       )

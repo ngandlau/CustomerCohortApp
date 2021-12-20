@@ -52,8 +52,7 @@ plotPeriodCohortViewServer <- function(id,
                         digits = digits,
                         isDollars = isDollars
                     )
-                }
-                
+                } 
             })
         }
     )

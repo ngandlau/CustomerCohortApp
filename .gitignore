@@ -1,0 +1,17 @@
+CustomerBasedFirmValuation.Rproj
+deploy.R
+.Rhistory
+.RData
+.gitattributes
+.git
+.Rproj.user
+R/rsconnect
+R/documentation.*
+R/functions.R
+R/unused_code.R
+R/tests/dev.R
+R/tests/test.R
+tests/dev.R
+tests/test.R
+desktop.ini
+R/www/flatly.min.css

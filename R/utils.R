@@ -32,6 +32,39 @@ CustomerEquity <- function(t, profitMatrix, discRate){
   ))
 }
 
+CustomerEquityExistCustomers <- function(t, profitMatrix, discRate){
+  if (t==1) return(0)
+  
+  ceCurrent <- CustomerEquity(
+    t = t,
+    profitMatrix = profitMatrix,
+    discRate = discRate
+  )[["ceCurrent"]]
+  
+  ceNew <- profitMatrix[t, t:ncol(profitMatrix)]
+  ceNew <- ceNew * GenDiscountFactors(discRate = discRate, lengthOut = length(ceNew))
+  ceNew <- sum(ceNew, na.rm = T)
+  
+  ceExist <- ceCurrent - ceNew
+  return(ceExist)
+}
+
+CustomerEquityNewCustomers <- function(t, profitMatrix, discRate){
+  ce <- CustomerEquity(
+    t = t,
+    profitMatrix = profitMatrix,
+    discRate = discRate
+  )
+  
+  if (t==1) return(ce[["ceCurrent"]])
+  
+  ceNew <- profitMatrix[t, t:ncol(profitMatrix)]
+  ceNew <- ceNew * GenDiscountFactors(discRate = discRate, lengthOut = length(ceNew))
+  ceNew <- sum(ceNew, na.rm = T)
+  return(ceNew)
+}
+
+
 IllustrativeValuationTable <- function(t, profitMatrix, discMatrix, isDiscounted,
                                        fixedCost, discRate, ce, noa, debt){
   if (isDiscounted == T){
@@ -312,7 +345,7 @@ PlotStepByStepDCFTable <- function(valuationPeriod, profitMatrix, discMatrix, di
     ) %>% 
     htmlTable(
       align = "lr",
-      rgroup = c("Free Cash Flow", "Financial Structure", "Valuation"),
+      rgroup = c("PV of Proft = 'Free Cash Flow'", "Financial Structure", "Valuation"),
       n.rgroup = c(5, 2, 1),
       ctable = c("solid", "double"),
       rnames = F
@@ -370,96 +403,187 @@ PlotDiscountedProfitContributionPerCohort <- function(discProfitsPerCohort){
 
 # Tab: Customer Equity Reporting ------------------------------------------
 
+CustomerAccounting <- function(t, custMatrix){
+  if (t == 1){
+    begin <- 0
+    lost <- 0
+    exist <- begin - lost
+    new <- custMatrix[1, 1]
+    end <- new + exist
+  } else {
+    begin <- sum(custMatrix[, (t-1)], na.rm = T)
+    new <- custMatrix[t, t]
+    exist <- sum(custMatrix[, t], na.rm = T) - new
+    lost <- begin - exist # per definition lost >= 0
+    end <- new + exist
+  }
+  return(list(
+    begin = begin,
+    lost = lost,
+    exist = exist,
+    new = new,
+    end = end
+  ))
+}
+
 PlotCustomerEquityReporting <- function(t, custMatrix, revMatrix, profitMatrix, discMatrix, discRate){
-  n <- t+1
-  
-  nCustomersNew <- Diag(custMatrix[1:n, 1:n])
-  nCustomersBegin <- ColSums(custMatrix[1:n, 1:n], na.rm = T)
-  nCustomersExist <- nCustomersBegin - nCustomersNew
-  nCustomersEnd <- nCustomersBegin - nCustomersNew
-  
-  nCustomersNew <- nCustomersNew[1:t]
-  nCustomersBegin <- nCustomersBegin[1:t]
-  nCustomersExist <- nCustomersExist[1:t]
-  nCustomersEnd <- nCustomersEnd[2:(t+1)]
-  nCustomersLost <- nCustomersEnd - nCustomersBegin
-  
-  revenues <- ColSums(revMatrix[1:t, 1:t], na.rm = T)
-  profits <- ColSums(profitMatrix[1:t, 1:t], na.rm = T)
-  profitPerCustomer <- profits / nCustomersBegin
-  
-  discProfitMatrix <- profitMatrix * discMatrix
-  
-  # customer equity in the current period t
-  ceOfCurrentCustomers <- CustomerEquity(t = t, profitMatrix = profitMatrix, discRate = discRate)[["ceCurrent"]]
-  ceOfExistingCustomers <- sum(discProfitMatrix[1:(t-1), t:ncol(discProfitMatrix)], na.rm = T)
-  ceOfNewCustomers <- sum(discProfitMatrix[t, t:ncol(discProfitMatrix)], na.rm = T)
-  ceOfLostCustomers <- NULL #TODO ??? why do we need that, really? Doesnt bring ANY value...
-  
-  # customer equity in the previous period t-1
-  t_ <- t-1
-  discMatrixPrev <- GenDiscountMatrix(
-    discRate = discRate,
-    dim = ncol(discMatrix),
-    startFromPeriod = t_
-  )
-  discProfitMatrixPrev <- profitMatrix * discMatrixPrev
-  
-  ceOfCurrentCustomersPrev <- CustomerEquity(t = t_, profitMatrix = profitMatrix, discRate = discRate)[["ceCurrent"]]
-  ceOfExistingCustomersPrev <- sum(discProfitMatrixPrev[1:(t_-1), t:ncol(discProfitMatrixPrev)], na.rm = T)
-  ceOfNewCustomersPrev <- sum(discProfitMatrix[t_, t_:ncol(discProfitMatrix)], na.rm = T)
-  ceOfLostCustomersPrev <- NULL #TODO ??? why do we need that, really? Doesnt bring ANY value...
-  
-  revenueRow <- revenues[(t-1):t]
-  profitRow <- profits[(t-1):t]
-  
-  nBeginRow <- nCustomersBegin[(t-1):t]
-  nExistRow <- nCustomersExist[(t-1):t]
-  nNewRow <- nCustomersNew[(t-1):t]
-  
-  nEndRow <- nCustomersEnd[(t-1):t]
-  nLostRow <- nCustomersLost[(t-1):t]
-  
-  profitPerCustomerRow <- profitPerCustomer[(t-1):t]
-  
-  ceOfCurrentCustomersRow <- c(ceOfCurrentCustomersPrev, ceOfCurrentCustomers)
-  ceOfExistCustomersRow <- c(ceOfExistingCustomersPrev, ceOfExistingCustomers)
-  ceOfNewCustomersRow <- c(ceOfNewCustomersPrev, ceOfNewCustomers)
-  
-  valuesBefore <- c(
-    revenues[t_],
-    profits[t_],
-    nCustomersBegin[t_],
-    nCustomersExist[t_],
-    nCustomersNew[t_],
-    nCustomersEnd[t_],
-    nCustomersLost[t_],
-    profitPerCustomer[t_],
-    ceOfCurrentCustomersPrev,
-    ceOfExistingCustomersPrev,
-    ceOfNewCustomersPrev
-  )
-  
-  valuesAfter <- c(
-    revenues[t],
-    profits[t],
-    nCustomersBegin[t],
-    nCustomersExist[t],
-    nCustomersNew[t],
-    nCustomersEnd[t],
-    nCustomersLost[t],
-    profitPerCustomer[t],
-    ceOfCurrentCustomers,
-    ceOfExistingCustomers,
-    ceOfNewCustomers
-  )
-  
   FormatValues <- function(x){
     x <- as.character(round(x, 0))
     x[1:2] <- FormatDollars(as.numeric(x[1:2]), digits = 0)
     x[8:11] <- FormatDollars(as.numeric(x[8:11]), digits = 0)
     return(x)
   }
+  
+  if (t==1){
+    cust <- CustomerAccounting(t = t, custMatrix = custMatrix)
+    beginCustomers <- cust[["begin"]]
+    existCustomers <- cust[["exist"]]
+    lostCustomers <- cust[["lost"]]
+    newCustomers <- cust[["new"]]
+    endCustomers <- cust[["end"]]
+    
+    revenues <- revMatrix[1, 1]
+    profits <- profitMatrix[1, 1]
+    profitPerCustomer <- profits / endCustomers
+    ceExist <- 0
+    ceNew <- sum(profitMatrix[1, ] * discMatrix[1, ], na.rm = T)
+    ceCurrent <- ceExist + ceNew
+    
+    result <- matrix(
+      data = FormatValues(c(
+        revenues,
+        profits,
+        beginCustomers,
+        lostCustomers,
+        existCustomers,
+        newCustomers,
+        endCustomers,
+        profitPerCustomer,
+        ceCurrent,
+        ceExist,
+        ceNew
+      )),
+      ncol = 1
+    )
+    
+    rownames(result) <- c(
+      "Revenue",
+      "Profit before Fixed Cost",
+      "Number of Customers at Beginning of Period, thereof",
+      "--- Number of Lost Customers",
+      "--- Number of Existing Customers",
+      "--- Number of New Customers",
+      "Number of Customers at End of Period",
+      "Profit per Customer",
+      "Customer Equity of Current Customers, thereof",
+      "--- Customer Equity of Existing Customers",
+      "--- Customer Equity of New Customers"
+    )
+    
+    colnames(result) <- "t=1"
+    
+    result <- data.table(result, keep.rownames = T)
+    setnames(x = result, old = "rn", new = "---")
+    
+    plt <- DT::datatable(
+      result, 
+      rownames = F,
+      options = list(
+        pageLength = 11,
+        info = F, # removes the "Show 1 of 11 entries"-text at the bottom of a DT
+        searching = F, # disables search bar in the top-right corner
+        paging = F, # disables "Show X entries" option
+        ordering = F
+      )
+    ) %>% 
+      formatStyle(
+        columns = 1,
+        target = "row",
+        fontWeight = styleEqual(
+          c(
+            "Revenue",
+            "Profit before Fixed Cost",
+            "Number of Customers at Beginning of Period, thereof",
+            "Number of Customers at End of Period",
+            "Profit per Customer",
+            "Customer Equity of Current Customers, thereof"
+          ),
+          rep("bold", 6)
+        )
+      )
+    return(plt)
+  }
+  
+  custPrev <- CustomerAccounting(t = t-1, custMatrix = custMatrix)
+  custCurr <- CustomerAccounting(t = t, custMatrix = custMatrix)
+  
+  beginCustomers <- c(custPrev[["begin"]], custCurr[["begin"]])
+  existCustomers <- c(custPrev[["exist"]], custCurr[["exist"]])
+  lostCustomers <- c(custPrev[["lost"]], custCurr[["lost"]])
+  newCustomers <- c(custPrev[["new"]], custCurr[["new"]])
+  endCustomers <- c(custPrev[["end"]], custCurr[["end"]])
+  
+  revenues <- tail(ColSums(revMatrix[1:t, 1:t], na.rm = T), 2)
+  profits <- tail(ColSums(profitMatrix[1:t, 1:t], na.rm = T), 2)
+  profitPerCustomer <- profits / endCustomers
+  
+  discProfitMatrix <- profitMatrix * discMatrix
+  
+  ceCurrent <- c(
+    CustomerEquity(
+      t = t-1,
+      profitMatrix = profitMatrix,
+      discRate = discRate
+    )[["ceCurrent"]],
+    CustomerEquity(
+      t = t,
+      profitMatrix = profitMatrix,
+      discRate = discRate
+    )[["ceCurrent"]]
+  )
+  
+  ceExist <- c(
+    CustomerEquityExistCustomers(
+      t = t-1,
+      profitMatrix = profitMatrix,
+      discRate = discRate
+    ),
+    CustomerEquityExistCustomers(
+      t = t,
+      profitMatrix = profitMatrix,
+      discRate = discRate
+    )
+  )
+  
+  ceNew <- c(
+    CustomerEquityNewCustomers(
+      t = t-1,
+      profitMatrix = profitMatrix,
+      discRate = discRate
+    ),
+    CustomerEquityNewCustomers(
+      t = t,
+      profitMatrix = profitMatrix,
+      discRate = discRate
+    )
+  )
+  
+  result <- rbind(
+    revenues,
+    profits,
+    beginCustomers,
+    lostCustomers,
+    existCustomers,
+    newCustomers,
+    endCustomers,
+    profitPerCustomer,
+    ceCurrent,
+    ceExist,
+    ceNew
+  )
+  
+  valuesBefore <- as.numeric(result[, 1])
+  valuesAfter <- as.numeric(result[, 2])
   
   valuesBefore <- FormatValues(x = valuesBefore)
   valuesAfter <- FormatValues(x = valuesAfter)
@@ -468,12 +592,12 @@ PlotCustomerEquityReporting <- function(t, custMatrix, revMatrix, profitMatrix, 
   
   rownames(result) <- c(
     "Revenue",
-    "Profit",
+    "Profit before Fixed Cost",
     "Number of Customers at Beginning of Period, thereof",
+    "--- Number of Lost Customers",
     "--- Number of Existing Customers",
     "--- Number of New Customers",
     "Number of Customers at End of Period",
-    "Number of Lost Customers",
     "Profit per Customer",
     "Customer Equity of Current Customers, thereof",
     "--- Customer Equity of Existing Customers",
@@ -508,23 +632,22 @@ PlotCustomerEquityReporting <- function(t, custMatrix, revMatrix, profitMatrix, 
           "Profit",
           "Number of Customers at Beginning of Period, thereof",
           "Number of Customers at End of Period",
-          "Number of Lost Customers",
           "Profit per Customer",
           "Customer Equity of Current Customers, thereof"
         ),
-        rep("bold", 7)
+        rep("bold", 6)
       )
     )
 }
 
 # Tab: Cohort View -------------------------------------------------------------
 
-CohortViewTable <- function(revMatrix, costMatrix, acqCostMatrix, retCostMatrix, varCostMatrix, profitMatrix, discMatrix, n, isDiscounted){
+CohortViewTable <- function(revMatrix, costMatrix, acqCostMatrix, retCostMatrix, prodCostMatrix, profitMatrix, discMatrix, n, isDiscounted){
   revMatrix <- revMatrix[1:n, 1:n]
   costMatrix <- costMatrix[1:n, 1:n]
   acqCostMatrix <- acqCostMatrix[1:n, 1:n]
   retCostMatrix <- retCostMatrix[1:n, 1:n]
-  varCostMatrix <- varCostMatrix[1:n, 1:n]
+  prodCostMatrix <- prodCostMatrix[1:n, 1:n]
   profitMatrix <- profitMatrix[1:n, 1:n]
   discMatrix <- discMatrix[1:n, 1:n]
   
@@ -539,7 +662,7 @@ CohortViewTable <- function(revMatrix, costMatrix, acqCostMatrix, retCostMatrix,
     Costs           = (-1)*RowSums(costMatrix, na.rm = T),
     AcquisitionCosts     = (-1)*RowSums(acqCostMatrix, na.rm = T),
     RetentionCosts       = (-1)*RowSums(retCostMatrix, na.rm = T),
-    ProductCosts = (-1)*RowSums(varCostMatrix, na.rm = T),
+    ProductCosts = (-1)*RowSums(prodCostMatrix, na.rm = T),
     Profits         = RowSums(profitMatrix, na.rm = T)
   )
   names(cohortViewTable) <- sapply(names(cohortViewTable), SplitStringAtUppercase)
@@ -581,10 +704,10 @@ PlotCohortViewTable <- function(cohortViewTable, digits){
 #' @return data.table
 #'
 #' @examples
-ComputeProfitLossStatement <- function(n, revMatrix, varCostMatrix,
+ComputeProfitLossStatement <- function(n, revMatrix, prodCostMatrix,
                                        acqCostMatrix, retCostMatrix, fixedCost){
   revMatrix <- revMatrix[1:n, 1:n]
-  varCostMatrix <- varCostMatrix[1:n, 1:n]
+  prodCostMatrix <- prodCostMatrix[1:n, 1:n]
   acqCostMatrix <- acqCostMatrix[1:n, 1:n]
   retCostMatrix <- retCostMatrix[1:n, 1:n]
   
@@ -592,7 +715,7 @@ ComputeProfitLossStatement <- function(n, revMatrix, varCostMatrix,
   revenuesOfNewCustomers <- Diag(revMatrix)
   revenuesOfExistingCustomers <- revenues - revenuesOfNewCustomers
   
-  cogs <- ColSums(varCostMatrix, na.rm = T)
+  cogs <- ColSums(prodCostMatrix, na.rm = T)
   profitContributionBeforeMarketingCost <- revenues - cogs
   
   acquisitionCost <- ColSums(acqCostMatrix, na.rm = T)
@@ -616,8 +739,8 @@ ComputeProfitLossStatement <- function(n, revMatrix, varCostMatrix,
     `--- Product Costs` = (-1)*cogs,
     `--- Acquisition Costs` = (-1)*acquisitionCost,
     `--- Retention Costs` = (-1)*retentionCost,
-    `--- Fixed Costs` = (-1)*fixedCost,
     `Profits before Fixed Costs` = profitContributionAfterMarketingCost,
+    `Fixed Costs` = (-1)*fixedCost,
     `Profits after Fixed Costs` = profit
   ))
 }
@@ -830,6 +953,228 @@ PlotLinechart <- function(X, x){
 
 # Tab Dashboard > Dashboard ---------------------------------------------------------------
 
+PlotDashboardNCustomers <- function(custMatrix, toPeriod, plotType){
+  if (plotType == "period_view") {
+    PlotPeriodView(
+      X = custMatrix,
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      geomType = "geom_col",
+      title = NULL,
+      subtitle = NULL,
+      xlab = "Period",
+      ylab = "Number of Customers",
+      digits = 0,
+      isDollars = F
+    )
+  } else if (plotType == "cohort_view"){
+    PlotCohortView(
+      X = custMatrix,
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      geomType = "geom_col",
+      title = NULL,
+      subtitle = NULL,
+      xlab = "Period",
+      ylab = "Number of Customers",
+      digits = 0,
+      isDollars = F
+    )
+  } else if (plotType == "lost_exist_new"){
+    dtPlt <- NewExistLostCustomers(t = toPeriod, custMatrix = custMatrix)
+    PlotNewExistLostCustomers(dt = dtPlt)
+  } else if (plotType == "customer_retention_rate"){
+    crr <- CustomerRetentionRate(custMatrix, n = toPeriod)
+    PlotCustomerRetentionRate(crr)
+  }
+}
+
+PlotDashboardRevenues <- function(revMatrix, toPeriod, plotType){
+  if (plotType == "period_view") {
+    PlotPeriodView(
+      X = revMatrix,
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      geomType = "geom_col",
+      title = NULL,
+      subtitle = NULL,
+      xlab = "Period",
+      ylab = "Revenue",
+      digits = 0,
+      isDollars = T
+    )
+  } else if (plotType == "cohort_view"){
+    PlotCohortView(
+      X = revMatrix,
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      geomType = "geom_col",
+      title = NULL,
+      subtitle = NULL,
+      xlab = "Period",
+      ylab = "Revenue",
+      digits = 0,
+      isDollars = T
+    )
+  } else if (plotType == "lost_exist_new"){
+    dtPlt <- NewExistLostRevenue(revMatrix = revMatrix, n = toPeriod)
+    PlotNewExistLostRevenue(dt = dtPlt)
+  } else if (plotType == "quick_ratio"){
+    newExistLost <- NewExistLostRevenue(
+      revMatrix = revMatrix,
+      n = toPeriod
+    )
+    PlotQuickRatio(
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      newExistLostRevenue = newExistLost
+    )    
+  } else if (plotType == "share_exist_new"){
+    dtPlt <- ShareOfRevenueFromExistVsNew(revMatrix, n = toPeriod)
+    PlotShareOfRevenueFromExistVsNew(dtPlt)
+  } else if (plotType == "net_revenue_retention"){
+    nrr <- NetRevenueRetentionRate(revMatrix, n = toPeriod)
+    PlotNetRevenueRetentionRate(nrr)
+  }
+}
+
+PlotDashboardARPU <- function(arpuMatrix, toPeriod, plotType){
+  if (plotType == "period_view") {
+    PlotPeriodView(
+      X = arpuMatrix,
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      geomType = "geom_line",
+      title = NULL,
+      subtitle = NULL,
+      xlab = "Period",
+      ylab = "Value",
+      digits = 0,
+      isDollars = T,
+      colAggFunc = colMeans
+    )
+  } else if (plotType == "cohort_view"){
+    PlotCohortView(
+      X = arpuMatrix,
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      geomType = "geom_line",
+      title = NULL,
+      subtitle = NULL,
+      xlab = "Period",
+      ylab = "Value",
+      digits = 0,
+      isDollars = T
+    )
+  } 
+}
+
+PlotDashboardCosts <- function(prodCostMatrix, retCostMatrix, acqCostMatrix,
+                               fixedCost, toPeriod, plotType){
+  if (plotType == "cost_by_categories"){
+    PlotCostsPerPeriod(
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      prodCostMatrix = prodCostMatrix,
+      retCostMatrix = retCostMatrix,
+      acqCostMatrix = acqCostMatrix,
+      fixedCost = fixedCost
+    )
+  } else if (plotType == "marketing_cost_periods"){
+    marCostMatrix <- retCostMatrix + acqCostMatrix
+    PlotPeriodView(
+      X = marCostMatrix,
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      geomType = "geom_col",
+      title = NULL,
+      subtitle = NULL,
+      xlab = "Period",
+      ylab = "Cost",
+      digits = 0,
+      isDollars = T
+    )
+  } else if (plotType == "marketing_cost_cohorts"){
+    marCostMatrix <- retCostMatrix + acqCostMatrix
+    PlotCohortView(
+      X = marCostMatrix,
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      geomType = "geom_col",
+      title = NULL,
+      subtitle = NULL,
+      xlab = "Period",
+      ylab = "Cost",
+      digits = 0,
+      isDollars = T
+    )
+  }
+}
+
+PlotDashboardProfits <- function(revMatrix, profitMatrix, fixedCost,
+                                 toPeriod, plotType){
+  if (plotType == "profits_after_fixcost_by_periods"){
+    PlotProfitsPerPeriod(
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      profitMatrix = profitMatrix,
+      fixedCosts = fixedCost,
+      afterFixedCosts = T
+    )
+  } else if (plotType == "profits_by_periods"){
+    PlotProfitsPerPeriod(
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      profitMatrix = profitMatrix,
+      fixedCosts = fixedCost,
+      afterFixedCosts = F
+    )
+  } else if (plotType == "profits_by_cohorts"){
+    PlotProfitsByCohort(
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      profitMatrix = profitMatrix
+    )
+  } else if (plotType == "opmargin_by_periods"){
+    PlotOperatingMarginPerPeriod(
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      revMatrix = revMatrix,
+      profitMatrix = profitMatrix
+    )
+  } else if (plotType == "opmargin_by_cohorts"){
+    PlotOperatingMarginByCohort(
+      fromPeriod = 1,
+      toPeriod = toPeriod,
+      revMatrix = revMatrix,
+      profitMatrix = profitMatrix
+    )
+  }
+}
+
+PlotDashboardCohortLifetimeCurves <- function(
+  revMatrix, profitMatrix, prodCostMatrix, retCostMatrix, acqCostMatrix,
+  toPeriod, plotType){
+  isDollars <- T
+  if (plotType == "cum_revenue"){
+    X <- revMatrix
+  } else if (plotType == "cum_revenue/cac"){
+    X <- revMatrix / diag(acqCostMatrix)
+    isDollars <- F
+  } else if (plotType == "cum_profit_after_prodcost"){
+    X <- revMatrix - prodCostMatrix
+  } else if (plotType == "cum_profit_after_varcost"){
+    X <- revMatrix - prodCostMatrix - retCostMatrix
+  } else if (plotType == "cum_profit_after_prodcost_and_marcost"){
+    X <- revMatrix - prodCostMatrix - retCostMatrix - acqCostMatrix
+  } else if (plotType == "cum_profit_after_prodcost_and_marcost/cac"){
+    X <- profitMatrix / diag(acqCostMatrix)
+    isDollars <- F
+  }
+  cumX <- CumulativeCohortLifetimeValues(X = X, toPeriod = toPeriod)
+  PlotCumulativeCohortLifetimeValues(X = cumX, isDollars = isDollars)
+}
+
 PlotPeriodView <- function(X, fromPeriod, toPeriod, geomType, title, subtitle, xlab, ylab, digits, isDollars=F, colAggFunc=colSums){
   X <- as.matrix(X[1:toPeriod, fromPeriod:toPeriod])
   x <- colAggFunc(X, na.rm = T)
@@ -879,7 +1224,7 @@ PlotCohortView <- function(X, fromPeriod, toPeriod, geomType, title, subtitle, x
   if (geomType == "geom_col"){
     dtText <- dtText %>% 
       group_by(period) %>% 
-      summarise(y = sum(value))
+      summarise(y = round(sum(value), digits))
   } 
   
   if (geomType == "geom_col"){
@@ -918,7 +1263,7 @@ PlotCohortView <- function(X, fromPeriod, toPeriod, geomType, title, subtitle, x
       data = dtText,
       mapping = aes(x = period,
                     y = y,
-                    label = round(y, digits = digits),
+                    label = y,
                     fill = NULL,
                     color = NULL),
       vjust = -0.4
@@ -927,9 +1272,9 @@ PlotCohortView <- function(X, fromPeriod, toPeriod, geomType, title, subtitle, x
   return(plt)
 }
 
-PlotCostsPerPeriod <- function(fromPeriod, toPeriod, varCostMatrix,
+PlotCostsPerPeriod <- function(fromPeriod, toPeriod, prodCostMatrix,
                                retCostMatrix, acqCostMatrix, fixedCost){
-  varCost <- ColSums(varCostMatrix[1:toPeriod, fromPeriod:toPeriod], na.rm = T)
+  varCost <- ColSums(prodCostMatrix[1:toPeriod, fromPeriod:toPeriod], na.rm = T)
   retCost <- ColSums(retCostMatrix[1:toPeriod, fromPeriod:toPeriod], na.rm = T)
   acqCost <- ColSums(acqCostMatrix[1:toPeriod, fromPeriod:toPeriod], na.rm = T)
   fixCost <- rep(fixedCost, (toPeriod - fromPeriod + 1))
@@ -981,7 +1326,7 @@ PlotOperatingMarginPerPeriod <- function(fromPeriod, toPeriod, revMatrix, profit
     theme_gg() +
     scale_x_continuous(breaks = fromPeriod:toPeriod) +
     scale_y_continuous(labels = FormatPercent) +
-    geom_hline(yintercept = 0, color = "black", size = 1, linetype = "dashed") +
+    geom_hline(yintercept = 0, color = "gray20", size = 1, linetype = "dashed") +
     # ggtitle("Operating Margin per Period",
             # subtitle = "The operating margin measures how much profit the firm makes on $1 of revenue after paying for variable costs.") +
     xlab("Period") +
@@ -1010,7 +1355,7 @@ PlotProfitsPerPeriod <- function(fromPeriod, toPeriod, profitMatrix, fixedCosts,
     theme_gg() +
     scale_x_continuous(breaks = fromPeriod:toPeriod) +
     scale_y_continuous(labels = FormatDollars) +
-    geom_hline(yintercept = 0, color = "black", size = 1, linetype = "dashed") +
+    geom_hline(yintercept = 0, color = "gray20", size = 1, linetype = "dashed") +
     xlab("Period") +
     ylab("Profits")
   
@@ -1040,27 +1385,27 @@ PlotProfitsPerPeriod <- function(fromPeriod, toPeriod, profitMatrix, fixedCosts,
   return(plt)
 }
 
-PlotCostsByCohort <- function(fromPeriod, toPeriod, costMatrix){
-  X <- as.matrix(costMatrix[1:toPeriod, 1:toPeriod])
-  dt <- MatrixToDT(X)
-  dt <- dt[period >= fromPeriod, ]
-  dt[, cohort := as.factor(cohort)]
-  nCohorts <- length(unique(dt$cohort))
-  
-  suppressWarnings({
-    ggplot(dt, aes(x = period, y = value, fill = fct_rev(cohort))) +
-      geom_col(color = "gray20") +
-      scale_fill_manual(values = colorRampPalette(RColorBrewer::brewer.pal(nCohorts, "Blues"))(nCohorts)) +
-      scale_x_continuous(breaks = fromPeriod:toPeriod) +
-      scale_y_continuous(labels = FormatDollars) +
-      theme_gg() +
-      ggtitle("Variable Costs broken down by Cohorts",
-              subtitle = "Variable costs associated with a cohort include (1) acquisition costs, (2) retention costs, and (3) product costs.") +
-      xlab("Period") +
-      ylab("Costs") +
-      labs(fill = "Cohort")
-  })
-}
+# PlotCostsByCohort <- function(fromPeriod, toPeriod, costMatrix){
+#   X <- as.matrix(costMatrix[1:toPeriod, 1:toPeriod])
+#   dt <- MatrixToDT(X)
+#   dt <- dt[period >= fromPeriod, ]
+#   dt[, cohort := as.factor(cohort)]
+#   nCohorts <- length(unique(dt$cohort))
+#   
+#   suppressWarnings({
+#     ggplot(dt, aes(x = period, y = value, fill = fct_rev(cohort))) +
+#       geom_col(color = "gray20") +
+#       scale_fill_manual(values = colorRampPalette(RColorBrewer::brewer.pal(nCohorts, "Blues"))(nCohorts)) +
+#       scale_x_continuous(breaks = fromPeriod:toPeriod) +
+#       scale_y_continuous(labels = FormatDollars) +
+#       theme_gg() +
+#       ggtitle("Variable Costs broken down by Cohorts",
+#               subtitle = "Variable costs associated with a cohort include (1) acquisition costs, (2) retention costs, and (3) product costs.") +
+#       xlab("Period") +
+#       ylab("Costs") +
+#       labs(fill = "Cohort")
+#   })
+# }
 
 PlotOperatingMarginByCohort <- function(fromPeriod, toPeriod, revMatrix, profitMatrix){
   revMatrix <- as.matrix(revMatrix[1:toPeriod, 1:toPeriod])
@@ -1076,9 +1421,9 @@ PlotOperatingMarginByCohort <- function(fromPeriod, toPeriod, revMatrix, profitM
   
   suppressWarnings({
     ggplot(dt, aes(x = period, y = value, color = fct_rev(cohort))) +
-      geom_line(size = 1) +
-      geom_point(size = 3) +
-      geom_hline(yintercept = 0, color = "black", size = 1, linetype = "dashed") +
+      geom_line() +
+      geom_point(size = 2) +
+      geom_hline(yintercept = 0, color = "gray20", size = 1, linetype = "dashed") +
       scale_color_manual(values = colorRampPalette(RColorBrewer::brewer.pal(nCohorts, "Blues"))(nCohorts)) +
       scale_x_continuous(breaks = fromPeriod:toPeriod) +
       scale_y_continuous(labels = FormatPercent) +
@@ -1102,7 +1447,7 @@ PlotProfitsByCohort <- function(fromPeriod, toPeriod, profitMatrix){
     ggplot(dt, aes(x = period, y = value, color = fct_rev(cohort))) +
       geom_line(size = 1) +
       geom_point(size = 3) +
-      geom_hline(yintercept = 0, color = "black", size = 1, linetype = "dashed") +
+      geom_hline(yintercept = 0, color = "gray20", size = 1, linetype = "dashed") +
       scale_color_manual(values = colorRampPalette(RColorBrewer::brewer.pal(nCohorts, "Blues"))(nCohorts)) +
       scale_x_continuous(breaks = fromPeriod:toPeriod) +
       scale_y_continuous(labels = FormatDollars) +
@@ -1195,20 +1540,15 @@ PlotCustomerRetentionRate <- function(customerRetentionRates){
 }
 
 NewExistLostCustomers <- function(t, custMatrix){
-  beginMatrix <- as.matrix(custMatrix[1:t, 1:t])
-  endMatrix <- as.matrix(custMatrix[1:t, 2:(t+1)])
-  
-  lostMatrix <- endMatrix - beginMatrix
-  lost <- ColSums(lostMatrix, na.rm = T)
-  
-  new <- Diag(beginMatrix)
-  exist <- ColSums(beginMatrix, na.rm = T) - new
+  result <- t(rbindlist(lapply(1:5, function(t){
+    as.data.table(data.frame(CustomerAccounting(t = t, custMatrix = custMatrix)))
+  })))
   
   dt <- data.table(
     t = 1:t,
-    new = new,
-    exist = exist,
-    lost = lost
+    new = result["new", ],
+    exist = result["exist", ],
+    lost = (-1)*result["lost", ]
   )
   dt <- melt(dt,
              measure.vars = c("new", "exist", "lost"),
@@ -1223,13 +1563,26 @@ PlotNewExistLostCustomers <- function(dt){
   colorExist <- kDarkestBlue
   colorNew <- kMidBlue
   
+  dtLabels <- copy(dt)
+  dtLabels <- dtLabels %>% 
+    filter(Category %in% c("new", "exist")) %>% 
+    group_by(t) %>%
+    summarise(
+      total = sum(nCustomers)
+    )
+  
   ggplot(dt, aes(x = t, y = nCustomers, fill = Category)) +
     geom_col(color = "gray20") +
+    geom_text(
+      mapping = aes(x = t, y = total, label = round(total), fill = NULL),
+      data = dtLabels,
+      vjust = -0.4
+    ) +
     scale_fill_manual(
       values = c(colorNew, colorExist, colorLost)
     ) +
     theme_gg() +
-    geom_hline(yintercept = 0, color = "black", size = 1, linetype = "dashed") +
+    geom_hline(yintercept = 0, color = "gray20", size = 1, linetype = "dashed") +
     xlab("Period") +
     ylab("Number of Customers") +
     scale_x_continuous(breaks = 1:max(dt$t))
@@ -1259,19 +1612,31 @@ NewExistLostRevenue <- function(revMatrix, n){
 }
 
 PlotNewExistLostRevenue <- function(dt){
-  
   colorLost <- "tomato3"
   colorExist <- kDarkestBlue
   colorNew <- kMidBlue
   
+  dtLabels <- copy(dt)
+  dtLabels <- dtLabels %>% 
+    filter(Category %in% c("new", "exist")) %>% 
+    group_by(t) %>%
+    summarise(
+      total = sum(Revenue)
+    )
+  
+  
   ggplot(dt, aes(x = t, y = Revenue, fill = Category)) +
     geom_col(color = "gray20") +
+    geom_text(
+      mapping = aes(x = t, y = total, label = FormatDollars(total, digits = 0), fill = NULL),
+      data = dtLabels,
+      vjust = -0.4
+    ) + 
     scale_fill_manual(
       values = c(colorNew, colorExist, colorLost)
     ) +
     theme_gg() +
-    geom_hline(yintercept = 0, color = "black", size = 1) +
-    # ggtitle("Amount of New, Existing, and Lost Revenue") +
+    geom_hline(yintercept = 0, color = "gray20", size = 1) +
     xlab("Period") +
     ylab("Revenue") +
     scale_x_continuous(breaks = 1:max(dt$t)) +
@@ -1329,7 +1694,7 @@ PlotQuickRatio <- function(fromPeriod, toPeriod, newExistLostRevenue){
     geom_point(size = 3, color = kDarkestBlue) +
     scale_x_continuous(breaks = fromPeriod:toPeriod) +
     theme_gg() +
-    ggtitle("Quick Ratio = (Added Revenue) / (Lost Revenue)") +
+    # ggtitle("Quick Ratio = (Added Revenue) / (Lost Revenue)") +
     xlab("Period") +
     ylab("Quick Ratio")
     
@@ -1361,26 +1726,31 @@ PlotCohortedContributionLTVCACCurves <- function(X){
     ylab("LTV/CAC") 
 }
 
-CumulativeCohortLTVs <- function(revMatrix, n){
-  X <- as.matrix(revMatrix[1:n, 1:n])
+CumulativeCohortLifetimeValues <- function(X, toPeriod){
+  X <- as.matrix(X[1:toPeriod, 1:toPeriod])
   for (i in 1:nrow(X)){
     X[i, i:ncol(X)] <- cumsum(X[i, i:ncol(X)])
   }
   return(X)
 }
 
-PlotCumulativeCohortLTVs <- function(X){
-  dt <- MatrixToDT(as.matrix(X)) %>% 
-    mutate(cohort = as.factor(cohort),
-           age = age + 1)
+PlotCumulativeCohortLifetimeValues <- function(X, isDollars = T){
+  dt <- MatrixToDT(X) %>% 
+    mutate(cohort = as.factor(cohort), age = age + 1)
   
-  ggplot(dt, aes(x = age, y = value, color = cohort)) +
+  plt <- ggplot(dt, aes(x = age, y = value, color = cohort)) +
     geom_line() +
+    geom_point(size = 2) + 
+    geom_hline(yintercept = 0, color = "gray20", size = 1, linetype = "dashed") +
     theme_gg() +
     scale_x_continuous(breaks = min(dt$age):max(dt$age)) +
-    scale_y_continuous(labels = FormatDollars) +
     xlab("Cohort Age") +
-    ylab("Cumulative Revenue")
+    ylab("Value")
+  
+  if (isDollars == T){
+    plt <- plt + scale_y_continuous(labels = FormatDollars)
+  }
+  return(plt)
 }
 
 CumulativeProfitContribution <- function(profitMatrix, 
@@ -1415,7 +1785,7 @@ PlotCumulativeProfitContributionCurves <- function(adjProfitMatrix, title, subti
   ggplot(dt, aes(x = age, y = value, color = cohort)) +
     geom_line() +
     geom_point() +
-    geom_hline(yintercept = 0, color = "black", size = 1, linetype = "dashed") +
+    geom_hline(yintercept = 0, color = "gray20", size = 1, linetype = "dashed") +
     theme_gg() +
     scale_x_continuous(breaks = min(dt$age):max(dt$age)) +
     scale_y_continuous(labels = FormatDollars) +
@@ -1503,6 +1873,10 @@ FormatNumberToDollars <- function(x, digits = NULL){
     return("NA")
   }
   
+  if (!is.null(digits)){
+    x <- round(x, digits)
+  }
+  
   isNegative <- x < 0
   
   x <- as.character(abs(x))
@@ -1546,7 +1920,7 @@ FormatNumberToDollars <- function(x, digits = NULL){
 #' @examples 
 #' FormatDollars(10.5)
 #' FormatDollars(c(-1035.51313, 510.1), digits = 2)
-FormatDollars <- function(xs, digits = NULL){
+FormatDollars <- function(xs, digits = 2){
   if (length(xs) > 1){
     out <- sapply(xs, function(x) FormatNumberToDollars(x, digits = digits))
   } else {
@@ -1676,13 +2050,47 @@ MatrixToDT <- function(X, na.rm = T){
   return(dt)
 }
   
-TransformView <- function(X){
-  XTransf <- sapply(1:nrow(X), function(rowIdx){
-    row <- X[rowIdx, ]
-    rowTransf <- row[rowIdx:ncol(X)]
-    rowTransf <- FillUpZeros(rowTransf, ncol(X))
-  })
-  return(t(XTransf))
+# TransformView <- function(X){
+#   XTransf <- sapply(1:nrow(X), function(rowIdx){
+#     row <- X[rowIdx, ]
+#     rowTransf <- row[rowIdx:ncol(X)]
+#     rowTransf <- FillUpZeros(rowTransf, ncol(X))
+#   })
+#   return(t(XTransf))
+# }
+
+#' Transforms cohort matrices into different formats
+#'
+#' @param X: cohort matrix
+#' @param from: one of "cohort-period" or "cohort-age"
+#' @param to: one of "cohort-period" or "cohort-age"
+#'
+#' @return matrix
+TransformView <- function(X, from = "cohort-period", to = "cohort-age"){
+  if (from == "cohort-period" & to == "cohort-age"){
+    Xout <- sapply(1:nrow(X), function(rowIdx){
+      row <- X[rowIdx, ]
+      rowTransf <- row[rowIdx:ncol(X)]
+      rowTransf <- FillUpNAs(rowTransf, ncol(X))
+    })
+    return(t(Xout))
+  } else if (from == "cohort-age" & to == "cohort-period"){
+    dim <- ncol(X)
+    Xout <- sapply(1:nrow(X), function(rowIdx){
+      row <- X[rowIdx, 1:(dim-rowIdx+1)]
+      if (length(row) != dim){
+        row <- c(rep(NA, rowIdx-1), row)
+      }
+      return(row)
+    })
+  }
+  return(t(Xout))
+}
+
+# Appends NAs to the right of the vector until length(x)==length
+FillUpNAs <- function(x, length){
+  if (length == length(x)) return(x)
+  return(c(x, rep(NA, length - length(x))))
 }
 
 FillUpZeros <- function(x, length){
@@ -1710,6 +2118,8 @@ Subset <- function(X, n){
   X <- X[1:n, 1:n]
   return(X)
 }
+
+
 
 LoremIpsum <- function(textLength, approx = T){
   # Function stolen from https://www.r-bloggers.com/2020/11/little-useless-useful-r-functions-r-lorem-ipsum/
@@ -1816,6 +2226,49 @@ GenDiscountMatrix <- function(discRate, dim, startFromPeriod = 1) {
 
 }
 
+#' Generates a Cohort Matrix that allows for age, period, and cohort effects.
+#' An element of the matrix is given specified by:
+#' `y(age, period, cohort) = intercept + ageEffects[age] + periodEffects[period] + cohortEffects[cohort]`
+#'
+#' @param constant a numeric
+#' @param ageEffects a vector of length dim 
+#' @param periodEffects a vector of length dim
+#' @param cohortEffects a vector of length dim
+#'
+#' @return a matrix
+#' @examples 
+#' intercept <- 10
+#' a <- c(0, 0, 0, 0) 
+#' p <- c(0, 0, 0, 5) 
+#' c <- c(10, 20, 30, 40)
+#' GenAPCMatrix(constant = intercept, a = ageEffects,periodEffects = p, cohortEffects = c)
+GenAPCMatrix <- function(constant, ageEffects, periodEffects, cohortEffects){
+  dim <- length(ageEffects)
+  Xperiod <- matrix(
+    data = rep(periodEffects, dim),
+    nrow = dim,
+    ncol = dim,
+    byrow = T
+  )
+  Xcohort <- matrix(
+    data = rep(cohortEffects, dim),
+    nrow = dim,
+    ncol = dim
+  )
+  Xperiodcohort <- Xperiod + Xcohort
+  Xperiodcohort <- TransformView(Xperiodcohort, from = "cohort-period", to ="cohort-age")
+  
+  Xage <- matrix(
+    data = rep(ageEffects, dim),
+    nrow = dim,
+    ncol = dim,
+    byrow = T
+  )
+  Xageperiodcohort <- Xage + Xperiodcohort
+  Xageperiodcohort <- TransformView(Xageperiodcohort, from = "cohort-age", to = "cohort-period")
+  return(Xageperiodcohort + constant)
+}
+
 
 # App Styling -------------------------------------------------------------
 
@@ -1845,6 +2298,13 @@ Heading <- function(text){
   style <- "font-weight: bold; margin-top: 1em;"
   return(
     shiny::h3(text, style = style)
+  )
+}
+
+Heading2 <- function(text){
+  style <- "font-weight: bold; margin-top: 1em;"
+  return(
+    shiny::h4(text, style = style)
   )
 }
 
